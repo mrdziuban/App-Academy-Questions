@@ -49,7 +49,7 @@ INSERT INTO users('fname','lname')
 VALUES ('John','Smith'),('Crazy','Boy');
 
 INSERT INTO questions('title','body','author_id')
-VALUES ('Some','Handsome?',1),('dumb one','why am i a boy?',2);
+VALUES ('Some','Handsome?',1),('dumb one','why am i a boy?',2),('Hand','What is this?',1);
 
 INSERT INTO question_followers('question_id','user_id')
 VALUES (1,2),(2,1),(1,1);
@@ -58,4 +58,4 @@ INSERT INTO replies('reply','author_id','question_id','parent_id')
 VALUES ('YES!',2,1,NULL),('because of genetics?',1,2,NULL),('huh?',1,1,1);
 
 INSERT INTO question_likes('question_id','user_id')
-VALUES (1,2),(2,1),(1,1);
+VALUES (1,2),(2,1),(1,1),(1,2);
