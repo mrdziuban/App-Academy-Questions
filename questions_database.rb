@@ -13,12 +13,14 @@ class QuestionsDatabase < SQLite3::Database
 end
 
 class User
-  attr_reader :fname, :lname, :user_id
+  attr_accessor :fname, :lname
+  attr_reader :user_id
 
   def initialize(options = {})
     @fname = options['fname']
     @lname = options['lname']
-    @user_id = options['user_id']
+    # @user_id = options['user_id']
+    @user_id = nil
   end
 
   def self.find_by_name(fname, lname)
@@ -29,7 +31,7 @@ class User
     SQL
 
     users_data = QuestionsDatabase.instance.execute(query, fname, lname)
-    users_data.empty? ? nil : User.new(users_data[0])
+    users_data.empty? ? nil : User.new_with_id(users_data[0])
   end
 
   def self.find_by_id(id)
@@ -40,7 +42,7 @@ class User
     SQL
 
     users_data = QuestionsDatabase.instance.execute(query, id)
-    users_data.empty? ? nil : User.new(users_data[0])
+    users_data.empty? ? nil : User.new_with_id(users_data[0])
   end
 
   def authored_questions
@@ -59,30 +61,56 @@ class User
     QuestionLike.liked_questions_for_user_id(@user_id)
   end
 
-  # Final product: AVG of (COUNT(likes) for each of his questions)
-  # FROM question_likes AS ql JOIN
-  # GROUP BY
-  # WHERE questions.author_id = @user_id
   def average_karma
     query = <<-SQL
       SELECT
         CASE WHEN COUNT(x.q_id) = 0
           THEN 0
         ELSE
-          CAST(x.lc AS float)/COUNT(x.q_id)
+          CAST(SUM(x.lc) AS float)/COUNT(x.q_id)
         END
         AS avg
       FROM
        (SELECT COUNT(ql.user_id) AS lc, q.question_id AS q_id
         FROM questions AS q LEFT JOIN question_likes AS ql
         ON ql.question_id = q.question_id
-        WHERE q.author_id = ?
+        WHERE q.author_id = 1
         GROUP BY ql.question_id) AS x
     SQL
 
     likes_data = QuestionsDatabase.instance.execute(query, @user_id)
 
     likes_data.empty? ? nil : likes_data[0]['avg']
+  end
+
+  def save
+    if @user_id.nil?
+      query = <<-SQL
+        INSERT INTO users ('fname','lname')
+        VALUES (?, ?)
+      SQL
+      QuestionsDatabase.instance.execute(query, @fname, @lname)
+      @user_id = QuestionsDatabase.instance.last_insert_row_id
+    else
+      query = <<-SQL
+        UPDATE users
+          SET fname = ?, lname = ?
+          WHERE user_id = ?
+      SQL
+      QuestionsDatabase.instance.execute(query, @fname, @lname, @user_id)
+    end
+  end
+
+  private
+
+  def user_id=(user_id)
+    @user_id = user_id
+  end
+
+  def self.new_with_id(user = {})
+    new_user = self.new(user)
+    new_user.send :user_id=, user['user_id']
+    new_user
   end
 end
 
@@ -145,11 +173,15 @@ class Question
   def num_likes
     QuestionLike.num_likes_for_question_id(@question_id)
   end
+
+  def save
+
+  end
 end
 
 class Reply
   def initialize(options = {})
-    @id = options['id']
+    @id = nil
     @reply = options['reply']
     @author_id = options['author_id']
     @question_id = options['question_id']
@@ -233,6 +265,24 @@ class Reply
 
     replies_data.map {|x| Reply.new(x)}
   end
+
+  def save
+    if @user_id.nil?
+      query = <<-SQL
+        INSERT INTO replies ('reply','author_id','question_id','parent_id')
+        VALUES (?, ?, ?, ?)
+      SQL
+      QuestionsDatabase.instance.execute(query, @fname, @lname)
+      @user_id = QuestionsDatabase.instance.last_insert_row_id
+    else
+      query = <<-SQL
+        UPDATE users
+          SET fname = ?, lname = ?
+          WHERE user_id = ?
+      SQL
+      QuestionsDatabase.instance.execute(query, @fname, @lname, @user_id)
+    end
+  end
 end
 
 class QuestionFollower
@@ -255,7 +305,7 @@ class QuestionFollower
 
     return nil if followers_data.empty?
 
-    followers_data.map {|x| User.new(x)}
+    followers_data.map {|x| User.new_with_id(x)}
   end
 
   def self.followed_questions_for_user_id(user_id)
@@ -313,7 +363,7 @@ class QuestionLike
 
     return nil if users_data.empty?
 
-    users_data.map {|x| User.new(x)}
+    users_data.map {|x| User.new_with_id(x)}
   end
 
   def self.num_likes_for_question_id(question_id)
@@ -365,23 +415,3 @@ class QuestionLike
     questions_data.map {|x| Question.new(x)}
   end
 end
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
