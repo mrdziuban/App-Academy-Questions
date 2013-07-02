@@ -45,6 +45,19 @@ CREATE TABLE question_likes(
   FOREIGN KEY (user_id) REFERENCES users(user_id)
 );
 
+CREATE TABLE tags(
+  tag_id INTEGER PRIMARY KEY,
+  tag VARCHAR(255) NOT NULL
+);
+
+CREATE TABLE question_tags(
+  tag_id INTEGER NOT NULL,
+  question_id INTEGER NOT NULL,
+
+  FOREIGN KEY (tag_id) REFERENCES tags(tag_id)
+  FOREIGN KEY (question_id) REFERENCES questions(question_id)
+);
+
 INSERT INTO users('fname','lname')
 VALUES ('John','Smith'),('Crazy','Boy');
 

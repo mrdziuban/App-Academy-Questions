@@ -115,10 +115,10 @@ class User
 end
 
 class Question
-  attr_reader :title, :body, :author_id, :question_id
+  attr_accessor :title, :body, :author_id, :question_id
 
   def initialize(options = {})
-    @question_id = options['question_id']
+    @question_id = nil
     @title = options['title']
     @body = options['body']
     @author_id = options['author_id']
@@ -175,11 +175,41 @@ class Question
   end
 
   def save
-
+    if @question_id.nil?
+      query = <<-SQL
+        INSERT INTO questions ('title','body', 'author_id')
+        VALUES (?, ?, ?)
+      SQL
+      QuestionsDatabase.instance.execute(query, @title, @body, @author_id)
+      @question_id = QuestionsDatabase.instance.last_insert_row_id
+    else
+      query = <<-SQL
+        UPDATE questions
+          SET title = ?, body = ?
+          WHERE question_id = ?
+      SQL
+      QuestionsDatabase.instance.execute(query, @title, @body, @question_id)
+    end
   end
+
+  private
+
+  def question_id=(question_id)
+    @question_id = question_id
+  end
+
+  def self.new_with_id(question = {})
+    new_question = self.new(question)
+    new_question.send :question_id=, question['question_id']
+    new_question
+  end
+
 end
 
 class Reply
+  attr_accessor :reply
+  attr_reader :id
+
   def initialize(options = {})
     @id = nil
     @reply = options['reply']
@@ -199,7 +229,7 @@ class Reply
 
     return nil if replies_data.empty?
 
-    replies_data.map {|x| Reply.new(x)}
+    replies_data.map {|x| Reply.new_with_id(x)}
   end
 
   def self.find_by_question_id(question_id)
@@ -213,7 +243,7 @@ class Reply
 
     return nil if replies_data.empty?
 
-    replies_data.map {|x| Reply.new(x)}
+    replies_data.map {|x| Reply.new_with_id(x)}
   end
 
   def author
@@ -249,7 +279,7 @@ class Reply
 
     replies_data = QuestionsDatabase.instance.execute(query, @parent_id)
 
-    replies_data.empty? ? nil : Reply.new(replies_data[0])
+    replies_data.empty? ? nil : Reply.new_with_id(replies_data[0])
   end
 
   def child_replies
@@ -263,25 +293,37 @@ class Reply
 
     return nil if replies_data.empty?
 
-    replies_data.map {|x| Reply.new(x)}
+    replies_data.map {|x| Reply.new_with_id(x)}
   end
 
   def save
-    if @user_id.nil?
+    if @id.nil?
       query = <<-SQL
         INSERT INTO replies ('reply','author_id','question_id','parent_id')
         VALUES (?, ?, ?, ?)
       SQL
-      QuestionsDatabase.instance.execute(query, @fname, @lname)
-      @user_id = QuestionsDatabase.instance.last_insert_row_id
+      QuestionsDatabase.instance.execute(query, @reply, @author_id, @question_id, @parent_id)
+      @id = QuestionsDatabase.instance.last_insert_row_id
     else
       query = <<-SQL
-        UPDATE users
-          SET fname = ?, lname = ?
-          WHERE user_id = ?
+        UPDATE replies
+          SET reply = ?
+          WHERE id = ?
       SQL
-      QuestionsDatabase.instance.execute(query, @fname, @lname, @user_id)
+      QuestionsDatabase.instance.execute(query, @reply, @id)
     end
+  end
+
+  private
+
+  def id=(id)
+    @id = id
+  end
+
+  def self.new_with_id(reply = {})
+    new_reply = self.new(reply)
+    new_reply.send :id=, reply['id']
+    new_reply
   end
 end
 
