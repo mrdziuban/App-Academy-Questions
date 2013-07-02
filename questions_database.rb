@@ -54,6 +54,10 @@ class User
   def followed_questions
     QuestionFollower.followed_questions_for_user_id(@user_id)
   end
+
+  def liked_questions
+    QuestionLike.liked_questions_for_user_id(@user_id)
+  end
 end
 
 class Question
@@ -77,11 +81,11 @@ class Question
 
     return nil if questions_data.empty?
 
-    questions_arr = []
-    questions_data.length.times do |i|
-      questions_arr << Question.new(questions_data[i])
-    end
-    questions_arr
+    questions_data.map {|x| Question.new(x)}
+  end
+
+  def self.most_followed(n)
+    QuestionFollower.most_followed_questions(n)
   end
 
   def author
@@ -103,6 +107,15 @@ class Question
   def followers
     QuestionFollower.followers_for_question_id(@question_id)
   end
+
+  def likers
+    QuestionLike.likers_for_question_id(@question_id)
+  end
+
+  def num_likes
+    QuestionLike.num_likes_for_question_id(@question_id)
+  end
+
 end
 
 class QuestionFollower
@@ -123,11 +136,9 @@ class QuestionFollower
 
     followers_data = QuestionsDatabase.instance.execute(query, question_id)
 
-    followers_arr = []
-    followers_data.length.times do |i|
-      followers_arr << User.new(followers_data[i])
-    end
-    followers_arr
+    return nil if followers_data.empty?
+
+    followers_data.map {|x| User.new(x)}
   end
 
   def self.followed_questions_for_user_id(user_id)
@@ -140,18 +151,11 @@ class QuestionFollower
 
     questions_data = QuestionsDatabase.instance.execute(query, user_id)
 
-    questions_arr = []
-    questions_data.length.times do |i|
-      questions_arr << Question.new(questions_data[i])
-    end
-    questions_arr
+    return nil if questions_data.empty?
+
+    questions_data.map {|x| Question.new(x)}
   end
 
-  # Join question_followers to questions (SELECT * FROM question_followers JOIN questions)
-  # Return a question object
-  # Count number of followers per question (user_id), group by question_id
-  # COUNT(qf.user_id) GROUP BY qf.question_id
-  #
   def self.most_followed_questions(n)
     query = <<-SQL
       SELECT b.*
@@ -166,11 +170,9 @@ class QuestionFollower
 
     questions_data = QuestionsDatabase.instance.execute(query, n)
 
-    questions_arr = []
-    questions_data.length.times do |i|
-      questions_arr << Question.new(questions_data[i])
-    end
-    questions_arr
+    return nil if questions_data.empty?
+
+    questions_data.map {|x| Question.new(x)}
   end
 end
 
@@ -194,11 +196,7 @@ class Reply
 
     return nil if replies_data.empty?
 
-    replies_arr = []
-    replies_data.length.times do |i|
-      replies_arr << Reply.new(replies_data[i])
-    end
-    replies_arr
+    replies_data.map {|x| Reply.new(x)}
   end
 
   def self.find_by_question_id(question_id)
@@ -212,11 +210,7 @@ class Reply
 
     return nil if replies_data.empty?
 
-    replies_arr = []
-    replies_data.length.times do |i|
-      replies_arr << Reply.new(replies_data[i])
-    end
-    replies_arr
+    replies_data.map {|x| Reply.new(x)}
   end
 
   def author
@@ -266,11 +260,7 @@ class Reply
 
     return nil if replies_data.empty?
 
-    replies_arr = []
-    replies_data.length.times do |i|
-      replies_arr << Reply.new(replies_data[i])
-    end
-    replies_arr
+    replies_data.map {|x| Reply.new(x)}
   end
 end
 
@@ -278,6 +268,57 @@ class QuestionLike
   def initialize(options = {})
     @question_id = options['question_id']
     @user_id = options['user_id']
+  end
+
+  def self.likers_for_question_id(question_id)
+    query = <<-SQL
+      SELECT u.*
+      FROM users AS u JOIN (
+        SELECT ql.*
+        FROM question_likes AS ql JOIN questions AS q
+        ON ql.question_id = q.question_id
+        WHERE ql.question_id = ?
+      ) AS x
+      ON u.user_id = x.user_id
+    SQL
+
+    users_data = QuestionsDatabase.instance.execute(query, question_id)
+
+    return nil if users_data.empty?
+
+    users_data.map {|x| User.new(x)}
+  end
+
+  def self.num_likes_for_question_id(question_id)
+    query = <<-SQL
+      SELECT COUNT(user_id) AS num
+      FROM question_likes AS ql
+      WHERE ql.question_id = ?
+      GROUP BY ql.question_id
+    SQL
+
+    likes_data = QuestionsDatabase.instance.execute(query, question_id)
+
+    likes_data.empty? ? nil : likes_data[0]['num']
+  end
+
+  def self.liked_questions_for_user_id(user_id)
+    query = <<-SQL
+      SELECT q.*
+      FROM questions AS q JOIN (
+        SELECT ql.*
+        FROM question_likes AS ql JOIN users AS u
+        ON ql.user_id = u.user_id
+        WHERE ql.user_id = ?
+      ) AS x
+      ON q.question_id = x.question_id
+    SQL
+
+    questions_data = QuestionsDatabase.instance.execute(query, user_id)
+
+    return nil if questions_data.empty?
+
+    questions_data.map {|x| Question.new(x)}
   end
 end
 
