@@ -103,6 +103,41 @@ class QuestionFollower
     @question_id = options['question_id']
     @user_id = options['user_id']
   end
+
+  def self.followers_for_question_id(question_id)
+    # Join question_followers with questions on question_id
+    query = <<-SQL
+      SELECT u.*
+      FROM question_followers AS qf JOIN users AS u
+      ON (qf.user_id = u.user_id)
+      WHERE qf.question_id = ?
+    SQL
+
+    followers_data = QuestionsDatabase.instance.execute(query, question_id)
+
+    followers_arr = []
+    followers_data.length.times do |i|
+      followers_arr << User.new(followers_data[i])
+    end
+    followers_arr
+  end
+
+  def self.followed_questions_for_user_id(user_id)
+    query = <<-SQL
+      SELECT q.*
+      FROM question_followers AS qf JOIN questions AS q
+      ON qf.question_id = q.question_id
+      WHERE qf.user_id = ?
+    SQL
+
+    questions_data = QuestionsDatabase.instance.execute(query, user_id)
+
+    questions_arr = []
+    questions_data.length.times do |i|
+      questions_arr << Question.new(questions_data[i])
+    end
+    questions_arr
+  end
 end
 
 class Reply
@@ -160,6 +195,48 @@ class Reply
     replies_data = QuestionsDatabase.instance.execute(query, @author_id)
 
     replies_data.empty? ? nil : User.find_by_id(replies_data[0]['author_id'])
+  end
+
+  def question
+    query = <<-SQL
+      SELECT *
+      FROM questions
+      WHERE questions.question_id = ?
+    SQL
+
+    question_data = QuestionsDatabase.instance.execute(query, @question_id)
+
+    question_data.empty? ? nil : Question.new(question_data[0])
+  end
+
+  def parent_reply
+    query = <<-SQL
+      SELECT *
+      FROM replies
+      WHERE replies.id = ?
+    SQL
+
+    replies_data = QuestionsDatabase.instance.execute(query, @parent_id)
+
+    replies_data.empty? ? nil : Reply.new(replies_data[0])
+  end
+
+  def child_replies
+    query = <<-SQL
+      SELECT *
+      FROM replies
+      WHERE replies.parent_id = ?
+    SQL
+
+    replies_data = QuestionsDatabase.instance.execute(query, @id)
+
+    return nil if replies_data.empty?
+
+    replies_arr = []
+    replies_data.length.times do |i|
+      replies_arr << Reply.new(replies_data[i])
+    end
+    replies_arr
   end
 end
 
