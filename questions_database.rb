@@ -457,3 +457,30 @@ class QuestionLike
     questions_data.map {|x| Question.new(x)}
   end
 end
+
+class Tag
+  def self.most_popular
+    query = <<-SQL
+    SELECT t.tag,
+      z.title, z.body, z.author_id, z.likes
+    FROM tags AS t JOIN(
+      SELECT
+        qt.tag_id AS tag_id,
+        y.title AS title,
+        y.body AS body,
+        y.author_id AS author_id,
+        MAX(y.likes) AS likes
+      FROM question_tags AS qt JOIN
+        (SELECT q.*, COUNT(ql.user_id) AS likes
+        FROM question_likes AS ql JOIN questions AS q
+        ON ql.question_id = q.question_id
+        GROUP BY ql.question_id
+        ORDER BY COUNT(ql.user_id) DESC) AS y
+      ON qt.question_id = y.question_id
+      GROUP BY qt.tag_id) AS z
+      ON t.tag_id = z.tag_id
+    SQL
+
+    QuestionsDatabase.instance.execute(query)
+  end
+end
