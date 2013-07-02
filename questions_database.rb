@@ -50,10 +50,14 @@ class User
   def authored_replies
     Reply.find_by_user_id(@user_id)
   end
+
+  def followed_questions
+    QuestionFollower.followed_questions_for_user_id(@user_id)
+  end
 end
 
 class Question
-  attr_reader :title, :body, :author_id
+  attr_reader :title, :body, :author_id, :question_id
 
   def initialize(options = {})
     @question_id = options['question_id']
@@ -94,6 +98,10 @@ class Question
 
   def replies
     Reply.find_by_question_id(@question_id)
+  end
+
+  def followers
+    QuestionFollower.followers_for_question_id(@question_id)
   end
 end
 
