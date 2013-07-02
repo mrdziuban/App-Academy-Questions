@@ -146,6 +146,32 @@ class QuestionFollower
     end
     questions_arr
   end
+
+  # Join question_followers to questions (SELECT * FROM question_followers JOIN questions)
+  # Return a question object
+  # Count number of followers per question (user_id), group by question_id
+  # COUNT(qf.user_id) GROUP BY qf.question_id
+  #
+  def self.most_followed_questions(n)
+    query = <<-SQL
+      SELECT b.*
+      FROM questions b JOIN (SELECT qf.question_id, COUNT(qf.user_id)
+        FROM question_followers AS qf JOIN questions AS q
+        ON qf.question_id = q.question_id
+        GROUP BY qf.question_id
+        ORDER BY COUNT(qf.user_id) DESC
+        LIMIT ?) AS a
+      ON b.question_id = a.question_id
+    SQL
+
+    questions_data = QuestionsDatabase.instance.execute(query, n)
+
+    questions_arr = []
+    questions_data.length.times do |i|
+      questions_arr << Question.new(questions_data[i])
+    end
+    questions_arr
+  end
 end
 
 class Reply
